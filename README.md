@@ -11,6 +11,8 @@ runs [prism-ml/bonsai-1.7B](https://huggingface.co/prism-ml/Bonsai-1.7B-gguf) mo
 through llama cpu server. bind a host port, get a chat window -- and an
 OpenAI-compatible API on the same port.
 
+read more about about the bonsai rock in a [ubuntu discourse post](https://discourse.ubuntu.com/t/bonsai-on-a-rock/86366/1)
+
 ```
 docker run -d --rm --name bonsai -p 8080:8080 ghcr.io/rockcrafters/bonsai-rock/bonsai:1.7B
 curl http://localhost:8080/v1/models | jq '.models[].name'
