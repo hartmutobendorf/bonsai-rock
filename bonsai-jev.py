@@ -7,6 +7,7 @@
 #     "numpy",
 # ]
 # ///
+# based on https://www.nobodywho.ai/posts/jev-in-25-lines/
 import argparse
 import os
 import string
