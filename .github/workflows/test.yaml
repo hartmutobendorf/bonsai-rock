@@ -46,3 +46,12 @@ jobs:
         run: |
           cd bonsai/${{ inputs.version }}
           spread craft-adhoc:ubuntu-26.04-${{ matrix.arch }}
+
+      - name: Install Podman and crun
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y podman crun
+
+      - name: Test final rock with rootless Podman/crun
+        working-directory: bonsai/${{ inputs.version }}
+        run: bash tests/test_rootless_podman.sh bonsai_${{ inputs.version }}_${{ matrix.arch }}.rock

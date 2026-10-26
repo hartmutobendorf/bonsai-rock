@@ -13,7 +13,7 @@ function launch_rock() {
 function wait_http() {
     local url="$1" tries="${2:-60}" nap="${3:-2}" i
     for ((i = 0; i < tries; i++)); do
-        if curl -fsS -o /dev/null "$url"; then
+        if curl -fsS --connect-timeout 2 --max-time 5 -o /dev/null "$url"; then
             return 0
         fi
         sleep "$nap"

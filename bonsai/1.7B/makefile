@@ -58,6 +58,10 @@ SPREAD_FILTER ?= craft-adhoc:ubuntu-26.04-$(NATIVE_ARCH)
 test: bonsai_1.7B.rock build-test-image  ## Run tests (native arch; override SPREAD_FILTER=)
 	spread $(SPREAD_FILTER)
 
+.PHONY: test-unit
+test-unit:  ## Test OCI identity and layer handling without model downloads
+	ruby tests/test_little_surgery.rb
+
 .PHONY: size
 size:  ## Show size of bonsai_1.7B.rock if present
 	@if [ -f bonsai_1.7B.rock ]; then \
