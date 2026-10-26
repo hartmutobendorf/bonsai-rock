@@ -28,6 +28,28 @@ docker rm -f bonsai
 - `/` -- llama.cpp's built-in chat web ui
 - `/v1/models`, `/v1/chat/completions` -- OpenAI-compatible API, incl. streaming and tool-calls
 
+## rootless Podman
+
+The final OCI artifacts use `_daemon_` as UID/GID `1000:1000` for both Pebble
+and llama-server. Rockcraft's `_daemon_` defaults to `584792:584792`, outside
+the usual rootless mapping of container IDs `0` through `65536`; this can
+cause crun's `setgroups: Invalid argument` at startup.
+The build's `little-surgery.rb` normalizes passwd, group and OCI user metadata
+before exporting either architecture, without rewriting the model layers.
+The intermediate rock from `rockcraft pack` alone is **not** normalized.
+
+Rootless Podman still needs working user namespaces and subordinate UID/GID
+allocations (normally 65536 entries in `/etc/subuid` and `/etc/subgid`).
+Missing host mappings or host policies forbidding `setgroups` cannot be
+repaired by an image. Existing bind mounts must allow UID/GID 1000 to access
+any writable state; previously created Pebble state may need ownership migration.
+
+From `bonsai/1.7B`, `make test-unit` checks synthetic OCI images without model
+downloads (Ruby/minitest, GNU tar and umoci required). After `make build`,
+`bash tests/test_rootless_podman.sh bonsai_1.7B.rock` checks the final artifact
+with rootless Podman/crun, including readiness and a small OpenAI completion.
+CI runs this alongside the existing Docker tests on amd64 and arm64.
+
 ## links
 
 - https://github.com/PrismML-Eng/Bonsai-demo

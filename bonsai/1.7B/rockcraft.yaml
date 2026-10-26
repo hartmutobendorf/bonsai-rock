@@ -19,6 +19,7 @@ platforms:
   amd64:
   arm64:
 
+# little-surgery.rb maps this account to 1000:1000 in the final OCI artifact.
 run-user: _daemon_
 
 services:

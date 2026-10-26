@@ -117,6 +117,40 @@ def tar_dir(dir, out)
       '-cf', out, '-C', dir, '.')
 end
 
+# Rockcraft reserves _daemon_ as 584792:584792, outside the usual rootless
+# 65536 subordinate IDs. Keep the account name/home and Pebble's permissions.
+def normalize_runtime_user(oci_dir)
+  Dir.mktmpdir('bonsai-user') do |work|
+    rootfs = File.join(work, 'rootfs')
+    run(umoci, 'raw', 'unpack', '--rootless', '--image', "#{oci_dir}:#{IMG_TAG}", rootfs)
+    accounts = %w[passwd group].to_h do |name|
+      path = File.join(rootfs, 'etc', name)
+      rows = File.readlines(path).map { |line| line.chomp.split(':', -1) }
+      daemon = rows.select { |row| row[0] == '_daemon_' }
+      abort("expected one _daemon_ entry in /etc/#{name}") unless daemon.length == 1
+      abort("UID/GID 1000 already used in /etc/#{name}") if rows.any? { |row| row[0] != '_daemon_' && row[2] == '1000' }
+      daemon.first[2] = '1000'
+      daemon.first[3] = '1000' if name == 'passwd'
+      [name, rows.map { |row| row.join(':') }.join("\n") + "\n"]
+    end
+
+    stage = File.join(work, 'stage')
+    FileUtils.mkdir_p(File.join(stage, 'etc'))
+    accounts.each do |name, content|
+      path = File.join(stage, 'etc', name)
+      File.write(path, content)
+      File.chmod(0o644, path)
+    end
+    tar = File.join(work, 'user.tar')
+    tar_dir(stage, tar)
+    run(umoci, 'raw', 'add-layer', '--image', "#{oci_dir}:#{IMG_TAG}", tar,
+        '--history.created_by', 'bonsai rootless runtime account')
+  end
+
+  # An explicit primary group also avoids implicit supplementary group lookup.
+  run(umoci, 'config', '--image', "#{oci_dir}:#{IMG_TAG}", '--config.user', '1000:1000')
+end
+
 def inject_layers(oci_dir, shard_dir)
   shards = Dir.glob(File.join(shard_dir, '*.gguf')).sort
   abort("no .gguf shards in #{shard_dir}") if shards.empty?
@@ -149,7 +183,7 @@ def inject_layers(oci_dir, shard_dir)
 end
 
 # --- main --------------------------------------------------------------------
-# guarded so the file can be `require`d to drive inject_layers against a
+# guarded so the file can be `require`d to drive the image changes against a
 # synthetic oci layout, without running the pipeline.
 
 if $PROGRAM_NAME == __FILE__
@@ -167,7 +201,8 @@ if $PROGRAM_NAME == __FILE__
   FileUtils.mkdir_p('build/oci')   # skopeo's oci: transport needs the parent to exist
   run(skopeo, 'copy', "oci-archive:#{rock}", "oci:build/oci:#{IMG_TAG}")
 
-  puts '== 3/4 inject model shard layers =='
+  puts '== 3/4 normalize runtime user + inject model shard layers =='
+  normalize_runtime_user('build/oci')
   inject_layers('build/oci', shard_dir)
 
   puts "== 4/4 oci layout -> oci-archive (#{out}) =="
